@@ -1,0 +1,517 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dual Month Date Range Picker - Wix Integration</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: transparent;
+            padding: 10px;
+        }
+
+        .date-picker-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .calendar-wrapper {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .calendar {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 0 10px;
+        }
+
+        .month-year {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            text-align: center;
+            flex: 1;
+        }
+
+        .nav-button {
+            background: #f0f0f0;
+            border: none;
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .nav-button:hover {
+            background: #e0e0e0;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+        }
+
+        .day-header {
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            padding: 8px 4px;
+            background: #f8f8f8;
+        }
+
+        .day-cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            position: relative;
+            min-height: 40px;
+        }
+
+        .day-cell:hover {
+            background-color: #f0f8ff;
+        }
+
+        .day-cell.other-month {
+            color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .day-cell.disabled {
+            color: #ddd;
+            cursor: not-allowed;
+            background: #fafafa;
+        }
+
+        .day-cell.today {
+            background-color: #fff3cd;
+            border: 2px solid #ffc107;
+            font-weight: 600;
+        }
+
+        .day-cell.start-date {
+            background-color: #007bff;
+            color: white;
+            font-weight: 600;
+        }
+
+        .day-cell.end-date {
+            background-color: #007bff;
+            color: white;
+            font-weight: 600;
+        }
+
+        .day-cell.in-range {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .day-cell.hover-range {
+            background-color: #f0f8ff;
+            color: #007bff;
+        }
+
+        .selection-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .selection-info h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .date-display {
+            font-size: 14px;
+            color: #666;
+            margin: 3px 0;
+        }
+
+        .date-display.selected {
+            color: #007bff;
+            font-weight: 600;
+        }
+
+        .instructions {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #666;
+            font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            .calendar-wrapper {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .calendar {
+                min-width: 280px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="date-picker-container">
+        <div class="calendar-wrapper">
+            <div class="calendar" id="calendar1">
+                <div class="calendar-header">
+                    <button class="nav-button" id="prevMonth">‹</button>
+                    <div class="month-year" id="monthYear1"></div>
+                    <div style="width: 32px;"></div> <!-- Spacer -->
+                </div>
+                <div class="calendar-grid" id="grid1"></div>
+            </div>
+            
+            <div class="calendar" id="calendar2">
+                <div class="calendar-header">
+                    <div style="width: 32px;"></div> <!-- Spacer -->
+                    <div class="month-year" id="monthYear2"></div>
+                    <button class="nav-button" id="nextMonth">›</button>
+                </div>
+                <div class="calendar-grid" id="grid2"></div>
+            </div>
+        </div>
+
+        <div class="selection-info">
+            <h3>Selected Date Range</h3>
+            <div class="date-display" id="startDateDisplay">Delivery Date: Not selected</div>
+            <div class="date-display" id="endDateDisplay">Pickup Date: Not selected</div>
+            <div class="instructions" id="instructions">Select a delivery date (minimum 3 days from today)</div>
+        </div>
+    </div>
+
+    <script>
+        class WixDualDatePicker {
+            constructor() {
+                this.today = new Date();
+                this.currentMonth = new Date(this.today.getFullYear(), this.today.getMonth(), 1);
+                this.startDate = null;
+                this.endDate = null;
+                this.isSelectingEnd = false;
+                this.hoveredDate = null;
+                this.minimumDate = null;
+
+                this.monthNames = [
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'
+                ];
+
+                this.dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+                this.init();
+            }
+
+            async init() {
+                // Get minimum date from Wix
+                await this.getMinimumDateFromWix();
+                this.render();
+                this.attachEventListeners();
+            }
+
+            async getMinimumDateFromWix() {
+                try {
+                    // Try to get minimum date from parent Wix page
+                    if (parent && parent.getMinimumAllowedDeliveryDate) {
+                        this.minimumDate = await parent.getMinimumAllowedDeliveryDate();
+                    } else {
+                        // Fallback: 3 days from today
+                        this.minimumDate = new Date(this.today);
+                        this.minimumDate.setDate(this.minimumDate.getDate() + 3);
+                    }
+                } catch (e) {
+                    console.log("Using fallback minimum date");
+                    this.minimumDate = new Date(this.today);
+                    this.minimumDate.setDate(this.minimumDate.getDate() + 3);
+                }
+            }
+
+            attachEventListeners() {
+                document.getElementById('prevMonth').addEventListener('click', () => {
+                    this.currentMonth.setMonth(this.currentMonth.getMonth() - 1);
+                    this.render();
+                });
+
+                document.getElementById('nextMonth').addEventListener('click', () => {
+                    this.currentMonth.setMonth(this.currentMonth.getMonth() + 1);
+                    this.render();
+                });
+            }
+
+            setMinimumDate(date) {
+                this.minimumDate = new Date(date);
+                this.render();
+            }
+
+            setStoredDates(startDate, endDate) {
+                if (startDate && endDate) {
+                    this.startDate = new Date(startDate);
+                    this.endDate = new Date(endDate);
+                    this.isSelectingEnd = false;
+                    this.updateDateDisplay();
+                    this.render();
+                }
+            }
+
+            isDateDisabled(date) {
+                return this.minimumDate && date < this.minimumDate;
+            }
+
+            isSameDay(date1, date2) {
+                return date1 && date2 && 
+                       date1.getDate() === date2.getDate() &&
+                       date1.getMonth() === date2.getMonth() &&
+                       date1.getFullYear() === date2.getFullYear();
+            }
+
+            isDateInRange(date) {
+                if (!this.startDate || !this.endDate) return false;
+                return date >= this.startDate && date <= this.endDate;
+            }
+
+            isDateInHoverRange(date) {
+                if (!this.startDate || !this.hoveredDate || !this.isSelectingEnd) return false;
+                const start = this.startDate;
+                const end = this.hoveredDate;
+                const min = start < end ? start : end;
+                const max = start < end ? end : start;
+                return date >= min && date <= max;
+            }
+
+            async handleDayClick(date, dayElement) {
+                if (this.isDateDisabled(date)) return;
+
+                if (!this.isSelectingEnd) {
+                    // Selecting start date
+                    this.startDate = new Date(date);
+                    this.endDate = null;
+                    this.isSelectingEnd = true;
+                    this.updateInstructions('Now select a pickup date (must be at least 1 day after delivery date)');
+                } else {
+                    // Selecting end date
+                    if (date <= this.startDate) {
+                        // Invalid end date, restart selection
+                        this.startDate = new Date(date);
+                        this.endDate = null;
+                        this.isSelectingEnd = true;
+                        this.updateInstructions('Pickup date must be after delivery date. Select a new pickup date.');
+                    } else {
+                        this.endDate = new Date(date);
+                        this.isSelectingEnd = false;
+                        this.updateInstructions('Date range selected!');
+                        
+                        // Send dates to Wix
+                        await this.sendToWix();
+                    }
+                }
+
+                this.updateDateDisplay();
+                this.render();
+            }
+
+            handleDayHover(date) {
+                if (this.isSelectingEnd && this.startDate && !this.isDateDisabled(date)) {
+                    this.hoveredDate = new Date(date);
+                    this.render();
+                }
+            }
+
+            handleDayLeave() {
+                this.hoveredDate = null;
+                this.render();
+            }
+
+            updateInstructions(text) {
+                document.getElementById('instructions').textContent = text;
+            }
+
+            updateDateDisplay() {
+                const startDisplay = document.getElementById('startDateDisplay');
+                const endDisplay = document.getElementById('endDateDisplay');
+
+                if (this.startDate) {
+                    startDisplay.textContent = `Delivery Date: ${this.startDate.toLocaleDateString()}`;
+                    startDisplay.classList.add('selected');
+                } else {
+                    startDisplay.textContent = 'Delivery Date: Not selected';
+                    startDisplay.classList.remove('selected');
+                }
+
+                if (this.endDate) {
+                    endDisplay.textContent = `Pickup Date: ${this.endDate.toLocaleDateString()}`;
+                    endDisplay.classList.add('selected');
+                } else {
+                    endDisplay.textContent = 'Pickup Date: Not selected';
+                    endDisplay.classList.remove('selected');
+                }
+            }
+
+            async sendToWix() {
+                if (!this.startDate || !this.endDate) return;
+
+                try {
+                    // Try to call parent Wix function
+                    if (parent && parent.updateDatesFromDualPicker) {
+                        const success = await parent.updateDatesFromDualPicker(
+                            this.startDate.toISOString(),
+                            this.endDate.toISOString()
+                        );
+                        
+                        if (!success) {
+                            console.error("Failed to update dates in Wix");
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error communicating with Wix:", e);
+                }
+            }
+
+            renderCalendar(containerId, monthOffset) {
+                const container = document.getElementById(containerId);
+                const month = new Date(this.currentMonth.getFullYear(), this.currentMonth.getMonth() + monthOffset, 1);
+                
+                // Update month/year display
+                const monthYearId = containerId === 'grid1' ? 'monthYear1' : 'monthYear2';
+                document.getElementById(monthYearId).textContent = 
+                    `${this.monthNames[month.getMonth()]} ${month.getFullYear()}`;
+
+                // Clear container
+                container.innerHTML = '';
+
+                // Add day headers
+                this.dayNames.forEach(day => {
+                    const dayHeader = document.createElement('div');
+                    dayHeader.className = 'day-header';
+                    dayHeader.textContent = day;
+                    container.appendChild(dayHeader);
+                });
+
+                // Get first day of month and number of days
+                const firstDay = month.getDay();
+                const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+                const daysInPrevMonth = new Date(month.getFullYear(), month.getMonth(), 0).getDate();
+
+                // Add previous month days
+                for (let i = firstDay - 1; i >= 0; i--) {
+                    const dayElement = document.createElement('div');
+                    dayElement.className = 'day-cell other-month';
+                    dayElement.textContent = daysInPrevMonth - i;
+                    container.appendChild(dayElement);
+                }
+
+                // Add current month days
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const date = new Date(month.getFullYear(), month.getMonth(), day);
+                    const dayElement = document.createElement('div');
+                    dayElement.className = 'day-cell';
+                    dayElement.textContent = day;
+
+                    // Apply classes based on date status
+                    if (this.isSameDay(date, this.today)) {
+                        dayElement.classList.add('today');
+                    }
+
+                    if (this.isDateDisabled(date)) {
+                        dayElement.classList.add('disabled');
+                    } else {
+                        if (this.isSameDay(date, this.startDate)) {
+                            dayElement.classList.add('start-date');
+                        } else if (this.isSameDay(date, this.endDate)) {
+                            dayElement.classList.add('end-date');
+                        } else if (this.isDateInRange(date)) {
+                            dayElement.classList.add('in-range');
+                        } else if (this.isDateInHoverRange(date)) {
+                            dayElement.classList.add('hover-range');
+                        }
+
+                        // Add event listeners
+                        dayElement.addEventListener('click', () => this.handleDayClick(date, dayElement));
+                        dayElement.addEventListener('mouseenter', () => this.handleDayHover(date));
+                        dayElement.addEventListener('mouseleave', () => this.handleDayLeave());
+                    }
+
+                    container.appendChild(dayElement);
+                }
+
+                // Add next month days to fill grid
+                const totalCells = container.children.length - 7; // Subtract day headers
+                const remainingCells = 42 - totalCells; // 6 rows × 7 days = 42 cells
+                
+                for (let day = 1; day <= remainingCells; day++) {
+                    const dayElement = document.createElement('div');
+                    dayElement.className = 'day-cell other-month';
+                    dayElement.textContent = day;
+                    container.appendChild(dayElement);
+                }
+            }
+
+            render() {
+                this.renderCalendar('grid1', 0);
+                this.renderCalendar('grid2', 1);
+            }
+
+            // Method to get current selection (for Wix integration)
+            getSelectedDates() {
+                if (!this.startDate || !this.endDate) return null;
+                
+                return {
+                    deliveryDate: this.startDate,
+                    pickupDate: this.endDate,
+                    startDateISO: this.startDate.toISOString(),
+                    endDateISO: this.endDate.toISOString(),
+                    duration: Math.ceil((this.endDate - this.startDate) / (1000 * 60 * 60 * 24))
+                };
+            }
+        }
+
+        // Initialize the date picker
+        let datePicker;
+        
+        // Wait for DOM to be ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                datePicker = new WixDualDatePicker();
+            });
+        } else {
+            datePicker = new WixDualDatePicker();
+        }
+
+        // Expose globally for Wix integration
+        window.wixDualDatePicker = datePicker;
+    </script>
+</body>
+</html>
